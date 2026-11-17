@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Quantum Periodic Table</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+--bg-deep: #040711;
+--glass-bg: rgba(10, 16, 32, 0.72);
+--glass-border: rgba(120, 210, 255, 0.22);
+}
+
+* {
+box-sizing: border-box;
+user-select: none;
+-webkit-user-select: none;
+}
+
+body {
+margin: 0;
+padding: 0;
+overflow: hidden;
+background: radial-gradient(circle at 50% 45%, #0c1631 0%, #050814 55%, #020308 100%);
+font-family: 'Inter', sans-serif;
+color: #f1f5f9;
+width: 100vw;
+height: 100vh;
+}
+
+/* WebGL Background Starfield & Nebula Canvas */
+#webgl-bg {
+position: fixed;
+inset: 0;
+z-index: 1;
+pointer-events: none;
+}
+
+/* CSS3D Interactive Element Cards Layer */
+#css3d-container {
+position: fixed;
+inset: 0;
+z-index: 2;
+}
+
+/* 3D Element Card Styling */
+.element-card {
+width: 126px;
+height: 164px;
+border-radius: 12px;
+background: rgba(12, 20, 38, 0.86);
+border: 1.5px solid var(--el-color, #38bdf8);
+box-shadow: 0 0 18px rgba(0, 0, 0, 0.65), inset 0 0 16px var(--el-glow, rgba(56, 189, 248, 0.22));
+display: flex;
+flex-direction: column;
+justify-content: space-between;
+padding: 10px;
+cursor: pointer;
+transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+box-shadow 0.22s ease,
+background 0.22s ease,
+opacity 0.35s ease;
+backface-visibility: visible;
+position: relative;
+overflow: hidden;
+}
+
+.element-card::before {
+content: '';
+position: absolute;
+top: 0;
+left: 0;
+right: 0;
+height: 4px;
+background: var(--el-color, #38bdf8);
+box-shadow: 0 0 12px var(--el-color, #38bdf8);
+}
+
+.element-card:hover {
+background: rgba(20, 34, 64, 0.96);
+box-shadow: 0 0 32px var(--el-color, #38bdf8), inset 0 0 22px var(--el-glow, rgba(56, 189, 248, 0.45));
+z-index: 50;
+}
+
+.element-card.dimmed {
+opacity: 0.14 !important;
+filter: grayscale(75%);
+}
+
+.element-card.highlighted {
+box-shadow: 0 0 34px var(--el-color, #38bdf8), inset 0 0 24px var(--el-glow, rgba(56, 189, 248, 0.5));
+}
+
+.el-top {
+display: flex;
+justify-content: space-between;
+align-items: center;
+font-family: 'JetBrains Mono', monospace;
+font-size: 12px;
+color: rgba(226, 232, 240, 0.85);
+}
+
+.el-num {
+font-weight: 700;
+color: var(--el-color, #38bdf8);
+}
+
+.el-mass {
+font-size: 10px;
+opacity: 0.75;
+}
+
+.el-symbol {
+font-size: 42px;
+font-weight: 800;
+text-align: center;
+line-height: 1.05;
+letter-spacing: -0.02em;
+color: #ffffff;
+text-shadow: 0 0 16px var(--el-glow, rgba(56, 189, 248, 0.65));
+margin: 2px 0;
+}
+
+.el-name {
+font-size: 12px;
+font-weight: 600;
+text-align: center;
+color: #e2e8f0;
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+}
+
+.el-shells-mini {
+font-family: 'JetBrains Mono', monospace;
+font-size: 9.5px;
+text-align: center;
+color: rgba(148, 163, 184, 0.9);
+letter-spacing: 0.03em;
+}
+
+/* Glassmorphic UI Controls */
+.glass-panel {
+background: var(--glass-bg);
+backdrop-filter: blur(14px);
+-webkit-backdrop-filter: blur(14px);
+border: 1px solid var(--glass-border);
+box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+
+.mode-btn {
+transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mode-btn.active {
+background: linear-gradient(135deg, rgba(56, 189, 248, 0.32), rgba(139, 92, 246, 0.32));
+border-color: #38bdf8;
+color: #ffffff;
+box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+}
+
+/* Big Bang Flash Overlay */
+#bigbang-flash {
+position: fixed;
+inset: 0;
+z-index: 40;
+pointer-events: none;
+background: radial-gradient(circle at center, rgba(255, 255, 255, 0.95) 0%, rgba(125, 211, 252, 0.6) 28%, rgba(139, 92, 246, 0.2) 55%, transparent 78%);
+opacity: 0;
+transition: opacity 0.8s ease-out;
+}
+
+/* Presentation Clean Mode */
+body.presentation-clean .hud-element {
+opacity: 0;
+pointer-events: none;
+transform: translateY(10px);
+}
+
+.hud-element {
+transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+/* Custom Scrollbar for Legend on small screens */
+.no-scrollbar::-webkit-scrollbar {
+display: none;
+}
+.no-scrollbar {
+-ms-overflow-style: none;
+scrollbar-width: none;
+}
+</style>
+</head>
+<body>
+<!-- WebGL Cosmic Starfield & Big Bang Particle Canvas -->
+<canvas id="webgl-bg"></canvas>
+
+<!-- CSS3D Interactive Periodic Table Container -->
+<div id="css3d-container"></div>
+
+<!-- Big Bang Singularity Flash Effect -->
+<div id="bigbang-flash"></div>
+
+<!-- Top Header HUD -->
+<header class="hud-element fixed top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+<!-- Title Badge -->
+<div class="glass-panel rounded-2xl px-4 py-2.5 pointer-events-auto flex items-center gap-3">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-violet-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="2.5" fill="currentColor"></circle>
+<ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(30 12 12)"></ellipse>
+<ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(-30 12 12)"></ellipse>
+<ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(90 12 12)"></ellipse>
+</svg>
+</div>
+<div>
+<h1 class="text-sm sm:text-base font-bold tracking-tight text-white leading-tight">
+3D Quantum Periodic Table
+</h1>
+<p class="text-[11px] text-cyan-300/80 font-medium">
+118 Elements • Click any element for Bohr Atom Shell Model
+</p>
+</div>
+</div>
+
+<!-- Action Controls: Big Bang Replay, Auto-Orbit, Clean Presentation Mode -->
+<div class="flex items-center gap-2 pointer-events-auto">
+<button id="btn-bigbang" title="Replay Cosmic Big Bang Assembly"
+class="glass-panel hover:border-amber-400/70 text-amber-300 hover:text-amber-200 px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
+<span>✦</span>
+<span>Big Bang Intro</span>
+</button>
+
+<button id="btn-orbit" title="Toggle 3D Continuous Orbit"
+class="glass-panel mode-btn active px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+<svg class="w-3.5 h-3.5 animate-spin" style="animation-duration: 8s;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+<path d="M21 3v5h-5"></path>
+</svg>
+<span id="orbit-label">Auto-Orbit: ON</span>
+</button>
+
+<button id="btn-clean" title="Toggle Presentation Clean Mode (H)"
+class="glass-panel hover:border-cyan-400/60 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition">
+Hide HUD
+</button>
+</div>
+</header>
+
+<!-- Floating Show HUD Button when in Presentation Clean Mode -->
+<button id="btn-restore-hud"
+class="fixed top-4 right-4 z-30 glass-panel px-3.5 py-2 rounded-xl text-xs font-semibold text-cyan-300 border-cyan-400/40 hidden cursor-pointer hover:bg-slate-800/80 transition">
+Show HUD
+</button>
+
+<!-- Category Filter Bar (Left/Top Responsive) -->
+<aside class="hud-element fixed top-20 left-4 z-20 pointer-events-none max-w-[calc(100vw-2rem)]">
+<div id="category-legend" class="glass-panel rounded-2xl p-2 flex sm:flex-col gap-1.5 overflow-x-auto no-scrollbar pointer-events-auto">
+<!-- Populated dynamically via JS -->
+</div>
+</aside>
+
+<!-- Bottom 3D Formation Morphing Bar -->
+<nav class="hud-element fixed bottom-5 left-1/2 -translate-x-1/2 z-20 w-[94%] max-w-xl pointer-events-auto">
+<div class="glass-panel rounded-2xl p-1.5 grid grid-cols-4 gap-1.5">
+<button data-shape="table" class="mode-btn active rounded-xl py-2.5 px-2 text-xs sm:text-sm font-semibold text-slate-200 flex flex-col sm:flex-row items-center justify-center gap-1.5 border border-transparent cursor-pointer">
+<span class="text-cyan-400">⊞</span>
+<span>Periodic Table</span>
+</button>
+<button data-shape="sphere" class="mode-btn rounded-xl py-2.5 px-2 text-xs sm:text-sm font-semibold text-slate-200 flex flex-col sm:flex-row items-center justify-center gap-1.5 border border-transparent cursor-pointer">
+<span class="text-emerald-400">🌐</span>
+<span>World Sphere</span>
+</button>
+<button data-shape="helix" class="mode-btn rounded-xl py-2.5 px-2 text-xs sm:text-sm font-semibold text-slate-200 flex flex-col sm:flex-row items-center justify-center gap-1.5 border border-transparent cursor-pointer">
+<span class="text-violet-400">🧬</span>
+<span>Helix Spiral</span>
+</button>
+<button data-shape="ring" class="mode-btn rounded-xl py-2.5 px-2 text-xs sm:text-sm font-semibold text-slate-200 flex flex-col sm:flex-row items-center justify-center gap-1.5 border border-transparent cursor-pointer">
+<span class="text-amber-400">🪐</span>
+<span>Orbital Ring</span>
+</button>
+</div>
+<p class="text-center text-[11px] text-slate-400 mt-1.5 hidden sm:block">
+Drag to rotate 3D space • Scroll to zoom • Click any element to enlarge & view Electron Shells
+</p>
+</nav>
+
+<!-- Enlarged Element & Live Interactive Bohr Electron Shell Modal -->
+<div id="element-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md transition-opacity duration-300 opacity-0">
+<div id="modal-card" class="glass-panel relative w-full max-w-4xl rounded-3xl border border-cyan-400/40 overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300">
+
+<!-- Top Modal Bar -->
+<div class="flex items-center justify-between px-6 py-4 border-b border-slate-700/60 bg-slate-900/50">
+<div class="flex items-center gap-3">
+<span id="modal-badge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
+Category
+</span>
+<span id="modal-period-group" class="text-xs font-mono text-slate-400">
+Period 1 • Group 1
+</span>
+</div>
+<div class="flex items-center gap-2">
+<button id="btn-prev-el" title="Previous Element (Left Arrow)" class="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-600/50 cursor-pointer transition">
+← Prev
+</button>
+<button id="btn-next-el" title="Next Element (Right Arrow)" class="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-600/50 cursor-pointer transition">
+Next →
+</button>
+<button id="btn-close-modal" title="Close (Esc)" class="ml-2 w-8 h-8 rounded-full bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 flex items-center justify-center font-bold cursor-pointer transition">
+✕
+</button>
+</div>
+</div>
+<!-- Modal Main Grid: Left = Live 3D/2D Animated Bohr Shell Model, Right = Scientific Properties -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-0">
+
+<!-- Interactive Electron Shell Visualizer -->
+<div class="md:col-span-6 relative flex flex-col items-center justify-center p-6 bg-gradient-to-b from-slate-900/90 to-slate-950/95 border-b md:border-b-0 md:border-r border-slate-700/50 min-h-[340px]">
+<div class="absolute top-3 left-4 text-[11px] font-mono uppercase tracking-wider text-cyan-300/80 flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+Live Bohr Electron Shell Model
+</div>
+
+<canvas id="bohr-canvas" class="w-full max-w-[310px] aspect-square"></canvas>
+
+<!-- Shell Distribution Pills -->
+<div class="mt-2 flex flex-wrap items-center justify-center gap-1.5" id="modal-shells-pills">
+<!-- Injected dynamically -->
+</div>
+</div>
+
+<!-- Scientific Details & Element Card -->
+<div class="md:col-span-6 p-6 sm:p-7 flex flex-col justify-between bg-slate-900/40">
+<div>
+<div class="flex items-end justify-between gap-4 mb-4">
+<div>
+<div id="modal-atomic-number" class="font-mono text-2xl sm:text-3xl font-bold text-cyan-400">
+#1
+</div>
+<h2 id="modal-name" class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+Hydrogen
+</h2>
+</div>
+<div id="modal-symbol-box" class="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl font-black text-white border-2 shadow-lg">
+H
+</div>
+</div>
+
+<p id="modal-summary" class="text-sm text-slate-300 leading-relaxed mb-5">
+Element description and key scientific applications.
+</p>
+
+<!-- Data Metrics Grid -->
+<div class="grid grid-cols-2 gap-3 mb-4">
+<div class="p-3 rounded-2xl bg-slate-800/55 border border-slate-700/50">
+<div class="text-[11px] uppercase tracking-wider text-slate-400">Atomic Mass</div>
+<div id="modal-mass" class="font-mono text-base font-bold text-white mt-0.5">1.008 u</div>
+</div>
+<div class="p-3 rounded-2xl bg-slate-800/55 border border-slate-700/50">
+<div class="text-[11px] uppercase tracking-wider text-slate-400">Phase at STP</div>
+<div id="modal-phase" class="font-semibold text-base text-emerald-300 mt-0.5">Gas</div>
+</div>
+<div class="p-3 rounded-2xl bg-slate-800/55 border border-slate-700/50 col-span-2">
+<div class="text-[11px] uppercase tracking-wider text-slate-400">Electron Configuration</div>
+<div id="modal-config" class="font-mono text-sm sm:text-base font-semibold text-cyan-300 mt-0.5">1s¹</div>
+</div>
+</div>
+</div>
+
+<div class="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-400">
+<span id="modal-discovery">Discovered: 1766</span>
+<span class="font-mono text-cyan-400/80">Shells: K L M N O P Q</span>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/**
+* ============================================================================
+* 1. COMPLETE 118 CHEMICAL ELEMENTS DATASET
+* Format per entry: [Z, Symbol, Name, AtomicMass, CategoryKey, Col(1-18), Row(1-10), Phase, Year, Config, Summary]
+* ============================================================================
+*/
+const CATEGORIES = {
+'nonmetal': { label: 'Reactive Nonmetals', color: '#38bdf8', glow: 'rgba(56, 189, 248, 0.35)' },
+'noble': { label: 'Noble Gases', color: '#c084fc', glow: 'rgba(192, 132, 252, 0.35)' },
+'alkali': { label: 'Alkali Metals', color: '#fb7185', glow: 'rgba(251, 113, 133, 0.35)' },
+'alkaline': { label: 'Alkaline Earth', color: '#fbbf24', glow: 'rgba(251, 191, 36, 0.35)' },
+'metalloid': { label: 'Metalloids', color: '#2dd4bf', glow: 'rgba(45, 212, 191, 0.35)' },
+'halogen': { label: 'Halogens', color: '#4ade80', glow: 'rgba(74, 222, 128, 0.35)' },
+'transition': { label: 'Transition Metals', color: '#60a5fa', glow: 'rgba(96, 165, 250, 0.35)' },
+'post': { label: 'Post-Transition', color: '#a3e635', glow: 'rgba(163, 230, 53, 0.35)' },
+'lanthanide': { label: 'Lanthanides', color: '#f472b6', glow: 'rgba(244, 114, 182, 0.35)' },
+'actinide': { label: 'Actinides', color: '#fb923c', glow: 'rgba(251, 146, 60, 0.35)' }
+};
+
+const RAW_ELEMENTS = [
+[1,"H","Hydrogen","1.008","nonmetal",1,1,"Gas","1766","1s¹","The most abundant chemical substance in the universe, fueling stars through nuclear fusion and forming water."],
+[2,"He","Helium","4.0026","noble",18,1,"Gas","1868","1s²","Second lightest and second most abundant element; used in cryogenics, MRI magnets, and deep-sea breathing mixtures."],
+[3,"Li","Lithium","6.94","alkali",1,2,"Solid","1817","[He] 2s¹","Lightest solid metal with high electrochemical potential, essential for modern rechargeable lithium-ion batteries."],
+[4,"Be","Beryllium","9.0122","alkaline",2,2,"Solid","1798","[He] 2s²","Lightweight, high-melting alkaline earth metal used in aerospace structures and X-ray window components."],
+[5,"B","Boron","10.81","metalloid",13,2,"Solid","1808","[He] 2s² 2p¹","Metalloid crucial in borosilicate glass, high-strength fiberglass, and semiconductor doping."],
+[6,"C","Carbon","12.011","nonmetal",14,2,"Solid","Ancient","[He] 2s² 2p²","Tetravalent backbone of all organic life; forms diamond, graphite, graphene, and carbon nanotubes."],
+[7,"N","Nitrogen","14.007","nonmetal",15,2,"Gas","1772","[He] 2s² 2p³","Makes up 78% of Earth's atmosphere; vital component of amino acids, proteins, DNA, and fertilizers."],
+[8,"O","Oxygen","15.999","nonmetal",16,2,"Gas","1774","[He] 2s² 2p⁴","Highly reactive nonmetal essential for cellular respiration and combustion; third most abundant element in the cosmos."],
+[9,"F","Fluorine","18.998","halogen",17,2,"Gas","1886","[He] 2s² 2p⁵","Most electronegative and chemically reactive of all elements; used in fluoropolymers (Teflon) and dental care."],
+[10,"Ne","Neon","20.180","noble",18,2,"Gas","1898","[He] 2s² 2p⁶","Inert noble gas that emits a bright reddish-orange glow in high-voltage discharge tubes and lasers."],
+[11,"Na","Sodium","22.990","alkali",1,3,"Solid","1807","[Ne] 3s¹","Soft, reactive alkali metal vital for nerve impulse transmission and fluid balance in living organisms."],
+[12,"Mg","Magnesium","24.305","alkaline",2,3,"Solid","1755","[Ne] 3s²","Lightweight structural metal and the central atom in chlorophyll molecules driving photosynthesis."],
+[13,"Al","Aluminium","26.982","post",13,3,"Solid","1825","[Ne] 3s² 3p¹","Most abundant metal in Earth's crust; prized for low density, corrosion resistance, and aerospace alloys."],
+[14,"Si","Silicon","28.085","metalloid",14,3,"Solid","1824","[Ne] 3s² 3p²","Cornerstone of modern microelectronics, computer processors, solar photovoltaic cells, and silicates."],
+[15,"P","Phosphorus","30.974","nonmetal",15,3,"Solid","1669","[Ne] 3s² 3p³","Essential for DNA, RNA, ATP cellular energy transfer, and global agricultural fertilizers."],
+[16,"S","Sulfur","32.06","nonmetal",16,3,"Solid","Ancient","[Ne] 3s² 3p⁴","Multivalent nonmetal used in sulfuric acid production, rubber vulcanization, and essential amino acids."],
+[17,"Cl","Chlorine","35.45","halogen",17,3,"Gas","1774","[Ne] 3s² 3p⁵","Potent oxidizing halogen critical for water purification, pharmaceuticals, and PVC polymers."],
+[18,"Ar","Argon","39.948","noble",18,3,"Gas","1894","[Ne] 3s² 3p⁶","Third most abundant gas in Earth's atmosphere; provides inert shielding atmospheres for welding and electronics."],
+[19,"K","Potassium","39.098","alkali",1,4,"Solid","1807","[Ar] 4s¹","Essential electrolyte for cellular membrane potentials, heart function, and plant growth."],
+[20,"Ca","Calcium","40.078","alkaline",2,4,"Solid","1808","[Ar] 4s²","Primary structural mineral in bones, teeth, shells, and Portland cement."],
+[21,"Sc","Scandium","44.956","transition",3,4,"Solid","1879","[Ar] 3d¹ 4s²","Rare transition metal used in high-strength aluminium-scandium aerospace alloys and stadium lighting."],
+[22,"Ti","Titanium","47.867","transition",4,4,"Solid","1791","[Ar] 3d² 4s²","Exceptional strength-to-weight ratio and biocompatibility; used in jet engines, spacecraft, and medical implants."],
+[23,"V","Vanadium","50.942","transition",5,4,"Solid","1801","[Ar] 3d³ 4s²","Hard transition metal that strengthens structural steel alloys and powers grid-scale redox flow batteries."],
+[24,"Cr","Chromium","51.996","transition",6,4,"Solid","1797","[Ar] 3d⁵ 4s¹","Lustrous, corrosion-resistant metal essential for stainless steel and mirror-like chrome plating."],
+[25,"Mn","Manganese","54.938","transition",7,4,"Solid","1774","[Ar] 3d⁵ 4s²","Critical alloying agent in steel production and an essential cofactor in photosynthetic oxygen evolution."],
+[26,"Fe","Iron","55.845","transition",8,4,"Solid","Ancient","[Ar] 3d⁶ 4s²","Most used metal in human civilization; forms Earth's core and enables oxygen transport in hemoglobin."],
+[27,"Co","Cobalt","58.933","transition",9,4,"Solid","1735","[Ar] 3d⁷ 4s²","Ferromagnetic metal used in high-temperature superalloys, lithium-ion cathodes, and vitamin B12."],
+[28,"Ni","Nickel","58.693","transition",10,4,"Solid","1751","[Ar] 3d⁸ 4s²","Corrosion-resistant ferromagnetic metal used in stainless steel, coins, and high-capacity EV batteries."],
+[29,"Cu","Copper","63.546","transition",11,4,"Solid","Ancient","[Ar] 3d¹⁰ 4s¹","Superior electrical and thermal conductor forming the backbone of global power grids and electronics."],
+[30,"Zn","Zinc","65.38","transition",12,4,"Solid","1746","[Ar] 3d¹⁰ 4s²","Used for anti-corrosion galvanization of steel, brass alloys, and hundreds of human enzymes."],
+[31,"Ga","Gallium","69.723","post",13,4,"Solid","1875","[Ar] 3d¹⁰ 4s² 4p¹","Melts just above room temperature (29.76 °C); vital in GaAs and GaN semiconductors and LEDs."],
+[32,"Ge","Germanium","72.630","metalloid",14,4,"Solid","1886","[Ar] 3d¹⁰ 4s² 4p²","Semiconductor metalloid used in fiber-optic systems, infrared optics, and high-speed transistors."],
+[33,"As","Arsenic","74.922","metalloid",15,4,"Solid","Ancient","[Ar] 3d¹⁰ 4s² 4p³","Metalloid used in high-frequency gallium arsenide semiconductors and wood preservation."],
+[34,"Se","Selenium","78.971","nonmetal",16,4,"Solid","1817","[Ar] 3d¹⁰ 4s² 4p⁴","Photoconductive nonmetal used in solar cells, glass decolorizing, and antioxidant enzymes."],
+[35,"Br","Bromine","79.904","halogen",17,4,"Liquid","1826","[Ar] 3d¹⁰ 4s² 4p⁵","One of only two elements liquid at room temperature; used in flame retardants and specialty chemicals."],
+[36,"Kr","Krypton","83.798","noble",18,4,"Gas","1898","[Ar] 3d¹⁰ 4s² 4p⁶","Noble gas used in high-efficiency architectural window insulation, specialized flash lamps, and ion thrusters."],
+[37,"Rb","Rubidium","85.468","alkali",1,5,"Solid","1861","[Kr] 5s¹","Highly reactive alkali metal used in precision atomic clocks and Bose-Einstein condensate research."],
+[38,"Sr","Strontium","87.62","alkaline",2,5,"Solid","1790","[Kr] 5s²","Produces brilliant crimson flames in pyrotechnics and is used in optical atomic clocks."],
+[39,"Y","Yttrium","88.906","transition",3,5,"Solid","1794","[Kr] 4d¹ 5s²","Used in YAG lasers, high-temperature superconductors (YBCO), and phosphor coatings for LEDs."],
+[40,"Zr","Zirconium","91.224","transition",4,5,"Solid","1789","[Kr] 4d² 5s²","Extremely corrosion-resistant metal with low neutron absorption, ideal for nuclear reactor fuel cladding."],
+[41,"Nb","Niobium","92.906","transition",5,5,"Solid","1801","[Kr] 4d⁴ 5s¹","Superconducting transition metal used in MRI magnets, particle accelerators, and high-strength pipeline steel."],
+[42,"Mo","Molybdenum","95.95","transition",6,5,"Solid","1778","[Kr] 4d⁵ 5s¹","Very high melting point metal used to harden aerospace steels and catalyze nitrogen fixation."],
+[43,"Tc","Technetium","98","transition",7,5,"Solid","1937","[Kr] 4d⁵ 5s²","Lightest exclusively radioactive element; Tc-99m is the world's most widely used medical diagnostic isotope."],
+[44,"Ru","Ruthenium","101.07","transition",8,5,"Solid","1844","[Kr] 4d⁷ 5s¹","Platinum-group metal used in wear-resistant electrical contacts, chip resistors, and chemical catalysis."],
+[45,"Rh","Rhodium","102.91","transition",9,5,"Solid","1803","[Kr] 4d⁸ 5s¹","Ultra-rare, highly reflective precious metal critical for automotive catalytic converters."],
+[46,"Pd","Palladium","106.42","transition",10,5,"Solid","1803","[Kr] 4d¹⁰","Absorbs up to 900 times its volume in hydrogen; essential for catalytic converters and electronics."],
+[47,"Ag","Silver","107.87","transition",11,5,"Solid","Ancient","[Kr] 4d¹⁰ 5s¹","Highest electrical and thermal conductivity of any metal; vital in solar panels, electronics, and antimicrobials."],
+[48,"Cd","Cadmium","112.41","transition",12,5,"Solid","1817","[Kr] 4d¹⁰ 5s²","Used in cadmium telluride (CdTe) thin-film solar cells and specialized nuclear control rods."],
+[49,"In","Indium","114.82","post",13,5,"Solid","1863","[Kr] 4d¹⁰ 5s² 5p¹","Key ingredient in indium tin oxide (ITO) transparent conductive touchscreens and flat-panel displays."],
+[50,"Sn","Tin","118.71","post",14,5,"Solid","Ancient","[Kr] 4d¹⁰ 5s² 5p²","Malleable post-transition metal used in lead-free electronic solders, bronze alloys, and food packaging."],
+[51,"Sb","Antimony","121.76","metalloid",15,5,"Solid","Ancient","[Kr] 4d¹⁰ 5s² 5p³","Metalloid used in flame-retardant compounds, lead-acid batteries, and infrared detectors."],
+[52,"Te","Tellurium","127.60","metalloid",16,5,"Solid","1782","[Kr] 4d¹⁰ 5s² 5p⁴","Rare metalloid crucial for high-efficiency CdTe solar panels and phase-change memory devices."],
+[53,"I","Iodine","126.90","halogen",17,5,"Solid","1811","[Kr] 4d¹⁰ 5s² 5p⁵","Heaviest stable halogen; essential for human thyroid hormones, medical imaging contrast, and antiseptics."],
+[54,"Xe","Xenon","131.29","noble",18,5,"Gas","1898","[Kr] 4d¹⁰ 5s² 5p⁶","Dense noble gas powering spacecraft ion propulsion thrusters, deep-UV lithography, and medical anesthesia."],
+[55,"Cs","Caesium","132.91","alkali",1,6,"Solid","1860","[Xe] 6s¹","Soft golden alkali metal whose hyperfine transition defines the international SI second in atomic clocks."],
+[56,"Ba","Barium","137.33","alkaline",2,6,"Solid","1808","[Xe] 6s²","Used in medical gastrointestinal X-ray imaging (barium sulfate) and green fireworks."],
+[57,"La","Lanthanum","138.91","lanthanide",3,9,"Solid","1839","[Xe] 5d¹ 6s²","First lanthanide; used in high-refractive-index camera lenses, hybrid vehicle batteries, and catalysts."],
+[58,"Ce","Cerium","140.12","lanthanide",4,9,"Solid","1803","[Xe] 4f¹ 5d¹ 6s²","Most abundant rare-earth element; used in catalytic converters, glass polishing, and flint lighters."],
+[59,"Pr","Praseodymium","140.91","lanthanide",5,9,"Solid","1885","[Xe] 4f³ 6s²","Creates high-strength magnets for wind turbines and tints welder's protective goggles."],
+[60,"Nd","Neodymium","144.24","lanthanide",6,9,"Solid","1885","[Xe] 4f⁴ 6s²","Essential for NdFeB permanent magnets—the strongest magnets available—used in EVs and headphones."],
+[61,"Pm","Promethium","145","lanthanide",7,9,"Solid","1945","[Xe] 4f⁵ 6s²","Only radioactive lanthanide; used in miniature nuclear batteries for space probes and pacemakers."],
+[62,"Sm","Samarium","150.36","lanthanide",8,9,"Solid","1879","[Xe] 4f⁶ 6s²","Forms samarium-cobalt magnets that retain magnetism at extreme high temperatures in aerospace."],
+[63,"Eu","Europium","151.96","lanthanide",9,9,"Solid","1901","[Xe] 4f⁷ 6s²","Most reactive lanthanide; produces vibrant red and blue phosphors in displays and anti-counterfeit banknotes."],
+[64,"Gd","Gadolinium","157.25","lanthanide",10,9,"Solid","1880","[Xe] 4f⁷ 5d¹ 6s²","Strongly paramagnetic rare earth widely used as an intravenous MRI contrast agent."],
+[65,"Tb","Terbium","158.93","lanthanide",11,9,"Solid","1843","[Xe] 4f⁹ 6s²","Used in green phosphors, solid-state magnetostrictive actuators (Terfenol-D), and fuel cells."],
+[66,"Dy","Dysprosium","162.50","lanthanide",12,9,"Solid","1886","[Xe] 4f¹⁰ 6s²","Added to neodymium magnets to prevent demagnetization at high temperatures in electric vehicle motors."],
+[67,"Ho","Holmium","164.93","lanthanide",13,9,"Solid","1878","[Xe] 4f¹¹ 6s²","Possesses the highest magnetic permeability of any element; used in medical surgical lasers."],
+[68,"Er","Erbium","167.26","lanthanide",14,9,"Solid","1843","[Xe] 4f¹² 6s²","Vital dopant in erbium-doped fiber amplifiers (EDFAs) that boost global internet fiber-optic signals."],
+[69,"Tm","Thulium","168.93","lanthanide",15,9,"Solid","1879","[Xe] 4f¹³ 6s²","Second rarest lanthanide; used in portable X-ray devices and high-efficiency fiber lasers."],
+[70,"Yb","Ytterbium","173.05","lanthanide",16,9,"Solid","1878","[Xe] 4f¹⁴ 6s²","Used in ultra-precise optical lattice atomic clocks and high-power industrial fiber lasers."],
+[71,"Lu","Lutetium","174.97","lanthanide",17,9,"Solid","1907","[Xe] 4f¹⁴ 5d¹ 6s²","Densest and hardest lanthanide; used in PET medical scanners and petroleum cracking catalysts."],
+[72,"Hf","Hafnium","178.49","transition",4,6,"Solid","1923","[Xe] 4f¹⁴ 5d² 6s²","High-k dielectric material in advanced computer microchips and nuclear submarine control rods."],
+[73,"Ta","Tantalum","180.95","transition",5,6,"Solid","1802","[Xe] 4f¹⁴ 5d³ 6s²","Corrosion-immune metal essential for miniature high-capacitance capacitors in smartphones."],
+[74,"W","Tungsten","183.84","transition",6,6,"Solid","1783","[Xe] 4f¹⁴ 5d⁴ 6s²","Highest melting point of all pure metals (3,422 °C); used in rocket nozzles, X-ray targets, and drill bits."],
+[75,"Re","Rhenium","186.21","transition",7,6,"Solid","1925","[Xe] 4f¹⁴ 5d⁵ 6s²","Ultra-dense refractory metal added to single-crystal jet engine turbine superalloys."],
+[76,"Os","Osmium","190.23","transition",8,6,"Solid","1803","[Xe] 4f¹⁴ 5d⁶ 6s²","Densest naturally occurring element (22.59 g/cm³); used in ultra-hard instrument pivots and fountain pen nibs."],
+[77,"Ir","Iridium","192.22","transition",9,6,"Solid","1803","[Xe] 4f¹⁴ 5d⁷ 6s²","Most corrosion-resistant metal known; marker of the Cretaceous-Paleogene asteroid impact layer."],
+[78,"Pt","Platinum","195.08","transition",10,6,"Solid","1735","[Xe] 4f¹⁴ 5d⁹ 6s¹","Noble precious metal vital for hydrogen fuel cells, catalytic converters, and chemotherapy drugs."],
+[79,"Au","Gold","196.97","transition",11,6,"Solid","Ancient","[Xe] 4f¹⁴ 5d¹⁰ 6s¹","Inert, ductile precious metal used in microelectronics bonding, spacecraft thermal shielding, and jewelry."],
+[80,"Hg","Mercury","200.59","transition",12,6,"Liquid","Ancient","[Xe] 4f¹⁴ 5d¹⁰ 6s²","Only metallic element that is liquid at standard temperature and pressure; historically used in barometers."],
+[81,"Tl","Thallium","204.38","post",13,6,"Solid","1861","[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p¹","Soft post-transition metal used in specialized infrared optical lenses and cardiac stress imaging."],
+[82,"Pb","Lead","207.2","post",14,6,"Solid","Ancient","[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p²","Dense, malleable metal used in radiation shielding, grid backup batteries, and acoustic dampening."],
+[83,"Bi","Bismuth","208.98","post",15,6,"Solid","1753","[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p³","Forms iridescent stair-stepped hopper crystals; non-toxic heavy metal used in pharmaceuticals."],
+[84,"Po","Polonium","209","metalloid",16,6,"Solid","1898","[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁴","Discovered by Marie and Pierre Curie; intensely radioactive element used in space thermoelectric generators."],
+[85,"At","Astatine","210","halogen",17,6,"Solid","1940","[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁵","Rarest naturally occurring element in Earth's crust; studied for targeted alpha-particle cancer therapy."],
+[86,"Rn","Radon","222","noble",18,6,"Gas","1900","[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁶","Radioactive noble gas formed from natural uranium decay in rocks and soil."],
+[87,"Fr","Francium","223","alkali",1,7,"Solid","1939","[Rn] 7s¹","Extremely unstable, radioactive alkali metal; last element first discovered in nature rather than synthesized."],
+[88,"Ra","Radium","226","alkaline",2,7,"Solid","1898","[Rn] 7s²","Luminescent radioactive alkaline earth metal isolated by Marie and Pierre Curie from pitchblende."],
+[89,"Ac","Actinium","227","actinide",3,10,"Solid","1899","[Rn] 6d¹ 7s²","Prototype of the actinide series; glows pale blue in the dark due to intense radioactivity."],
+[90,"Th","Thorium","232.04","actinide",4,10,"Solid","1829","[Rn] 6d² 7s²","Weakly radioactive actinide explored as a safer, abundant nuclear fuel alternative to uranium."],
+[91,"Pa","Protactinium","231.04","actinide",5,10,"Solid","1913","[Rn] 5f² 6d¹ 7s²","Rare, dense radioactive actinide used primarily in scientific oceanography and geochronology research."],
+[92,"U","Uranium","238.03","actinide",6,10,"Solid","1789","[Rn] 5f³ 6d¹ 7s²","Heaviest naturally abundant primordial element; primary fuel for nuclear fission power reactors."],
+[93,"Np","Neptunium","237","actinide",7,10,"Solid","1940","[Rn] 5f⁴ 6d¹ 7s²","First synthetic transuranium element discovered; used as a precursor to produce Plutonium-238."],
+[94,"Pu","Plutonium","244","actinide",8,10,"Solid","1940","[Rn] 5f⁶ 7s²","Pu-238 radioisotope thermoelectric generators power deep-space missions like Voyager and Curiosity."],
+[95,"Am","Americium","243","actinide",9,10,"Solid","1944","[Rn] 5f⁷ 7s²","Synthetic actinide used in minuscule quantities inside household ionization smoke detectors."],
+[96,"Cm","Curium","247","actinide",10,10,"Solid","1944","[Rn] 5f⁷ 6d¹ 7s²","Named after Marie and Pierre Curie; used as an alpha-particle source in Mars rover X-ray spectrometers."],
+[97,"Bk","Berkelium","247","actinide",11,10,"Solid","1949","[Rn] 5f⁹ 7s²","Synthetic transuranium element synthesized at Berkeley and used to create superheavy elements like Tennessine."],
+[98,"Cf","Californium","251","actinide",12,10,"Solid","1950","[Rn] 5f¹⁰ 7s²","Potent neutron emitter used in nuclear reactor startup rods, cancer therapy, and metal detectors."],
+[99,"Es","Einsteinium","252","actinide",13,10,"Solid","1952","[Rn] 5f¹¹ 7s²","Named after Albert Einstein; discovered in the fallout debris of the first hydrogen bomb test."],
+[100,"Fm","Fermium","257","actinide",14,10,"Solid","1952","[Rn] 5f¹² 7s²","Named after Enrico Fermi; heaviest element that can be formed by neutron bombardment of lighter elements."],
+[101,"Md","Mendelevium","258","actinide",15,10,"Solid","1955","[Rn] 5f¹³ 7s²","Named after Dmitri Mendeleev, creator of the periodic table; first element synthesized one atom at a time."],
+[102,"No","Nobelium","259","actinide",16,10,"Solid","1958","[Rn] 5f¹⁴ 7s²","Named after Alfred Nobel; synthetic transuranium actinide produced in heavy-ion accelerators."],
+[103,"Lr","Lawrencium","266","actinide",17,10,"Solid","1961","[Rn] 5f¹⁴ 7s² 7p¹","Final member of the actinide series, named after cyclotron inventor Ernest Lawrence."],
+[104,"Rf","Rutherfordium","267","transition",4,7,"Solid","1969","[Rn] 5f¹⁴ 6d² 7s²","First transactinide superheavy element, named in honor of nuclear physics pioneer Ernest Rutherford."],
+[105,"Db","Dubnium","268","transition",5,7,"Solid","1970","[Rn] 5f¹⁴ 6d³ 7s²","Synthetic superheavy transition metal named after the Joint Institute for Nuclear Research in Dubna."],
+[106,"Sg","Seaborgium","269","transition",6,7,"Solid","1974","[Rn] 5f¹⁴ 6d⁴ 7s²","Named after Glenn T. Seaborg—the first person to have an element named after him while alive."],
+[107,"Bh","Bohrium","270","transition",7,7,"Solid","1981","[Rn] 5f¹⁴ 6d⁵ 7s²","Synthetic superheavy element named after Danish physicist Niels Bohr, pioneer of atomic shell theory."],
+[108,"Hs","Hassium","277","transition",8,7,"Solid","1984","[Rn] 5f¹⁴ 6d⁶ 7s²","Superheavy synthetic element predicted to have a very high density; named after Hesse, Germany."],
+[109,"Mt","Meitnerium","278","transition",9,7,"Solid","1982","[Rn] 5f¹⁴ 6d⁷ 7s²","Named in honor of physicist Lise Meitner, co-discoverer of nuclear fission."],
+[110,"Ds","Darmstadtium","281","transition",10,7,"Solid","1994","[Rn] 5f¹⁴ 6d⁸ 7s²","Synthesized at GSI Helmholtz Centre in Darmstadt, Germany via heavy-ion fusion."],
+[111,"Rg","Roentgenium","282","transition",11,7,"Solid","1994","[Rn] 5f¹⁴ 6d⁹ 7s²","Named after Wilhelm Röntgen, discoverer of X-rays; synthetic Group 11 superheavy element."],
+[112,"Cn","Copernicium","285","transition",12,7,"Gas","1996","[Rn] 5f¹⁴ 6d¹⁰ 7s²","Named after astronomer Nicolaus Copernicus; relativistic effects give it volatile, noble-gas-like properties."],
+[113,"Nh","Nihonium","286","post",13,7,"Solid","2004","[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p¹","First element discovered in Asia (RIKEN, Japan); named after Nihon, the Japanese word for Japan."],
+[114,"Fl","Flerovium","289","post",14,7,"Solid","1999","[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p²","Superheavy element near the theoretical 'island of stability' with relativistic closed-shell behavior."],
+[115,"Mc","Moscovium","290","post",15,7,"Solid","2003","[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p³","Synthetic superheavy pnictogen element synthesized via calcium-48 and americium-243 fusion."],
+[116,"Lv","Livermorium","293","post",16,7,"Solid","2000","[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁴","Named after Lawrence Livermore National Laboratory for its contributions to superheavy element discovery."],
+[117,"Ts","Tennessine","294","halogen",17,7,"Solid","2010","[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁵","Second-heaviest known element, named in recognition of Tennessee's oak ridge nuclear research institutions."],
+[118,"Og","Oganesson","294","noble",18,7,"Solid","2002","[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁶","Heaviest element on the periodic table (Z=118), completing Period 7; named after Yuri Oganessian."]
+];
+
+/**
+* Accurate electron shell counts [K, L, M, N, O, P, Q] for all 118 elements
+*/
+const SHELLS_BY_Z = {
+1:[1], 2:[2],
+3:[2,1], 4:[2,2], 5:[2,3], 6:[2,4], 7:[2,5], 8:[2,6], 9:[2,7], 10:[2,8],
+11:[2,8,1], 12:[2,8,2], 13:[2,8,3], 14:[2,8,4], 15:[2,8,5], 16:[2,8,6], 17:[2,8,7], 18:[2,8,8],
+19:[2,8,8,1], 20:[2,8,8,2], 21:[2,8,9,2], 22:[2,8,10,2], 23:[2,8,11,2], 24:[2,8,13,1], 25:[2,8,13,2],
+26:[2,8,14,2], 27:[2,8,15,2], 28:[2,8,16,2], 29:[2,8,18,1], 30:[2,8,18,2], 31:[2,8,18,3], 32:[2,8,18,4],
+33:[2,8,18,5], 34:[2,8,18,6], 35:[2,8,18,7], 36:[2,8,18,8],
+37:[2,8,18,8,1], 38:[2,8,18,8,2], 39:[2,8,18,9,2], 40:[2,8,18,10,2], 41:[2,8,18,12,1], 42:[2,8,18,13,1],
+43:[2,8,18,13,2], 44:[2,8,18,15,1], 45:[2,8,18,16,1], 46:[2,8,18,18], 47:[2,8,18,18,1], 48:[2,8,18,18,2],
+49:[2,8,18,18,3], 50:[2,8,18,18,4], 51:[2,8,18,18,5], 52:[2,8,18,18,6], 53:[2,8,18,18,7], 54:[2,8,18,18,8],
+55:[2,8,18,18,8,1], 56:[2,8,18,18,8,2],
+57:[2,8,18,18,9,2], 58:[2,8,18,19,9,2], 59:[2,8,18,21,8,2], 60:[2,8,18,22,8,2], 61:[2,8,18,23,8,2],
+62:[2,8,18,24,8,2], 63:[2,8,18,25,8,2], 64:[2,8,18,25,9,2], 65:[2,8,18,27,8,2], 66:[2,8,18,28,8,2],
+67:[2,8,18,29,8,2], 68:[2,8,18,30,8,2], 69:[2,8,18,31,8,2], 70:[2,8,18,32,8,2], 71:[2,8,18,32,9,2],
+72:[2,8,18,32,10,2], 73:[2,8,18,32,11,2], 74:[2,8,18,32,12,2], 75:[2,8,18,32,13,2], 76:[2,8,18,32,14,2],
+77:[2,8,18,32,15,2], 78:[2,8,18,32,17,1], 79:[2,8,18,32,18,1], 80:[2,8,18,32,18,2], 81:[2,8,18,32,18,3],
+82:[2,8,18,32,18,4], 83:[2,8,18,32,18,5], 84:[2,8,18,32,18,6], 85:[2,8,18,32,18,7], 86:[2,8,18,32,18,8],
+87:[2,8,18,32,18,8,1], 88:[2,8,18,32,18,8,2],
+89:[2,8,18,32,18,9,2], 90:[2,8,18,32,18,10,2], 91:[2,8,18,32,20,9,2], 92:[2,8,18,32,21,9,2], 93:[2,8,18,32,22,9,2],
+94:[2,8,18,32,24,8,2], 95:[2,8,18,32,25,8,2], 96:[2,8,18,32,25,9,2], 97:[2,8,18,32,27,8,2], 98:[2,8,18,32,28,8,2],
+99:[2,8,18,32,29,8,2], 100:[2,8,18,32,30,8,2], 101:[2,8,18,32,31,8,2], 102:[2,8,18,32,32,8,2], 103:[2,8,18,32,32,8,3],
+104:[2,8,18,32,32,10,2], 105:[2,8,18,32,32,11,2], 106:[2,8,18,32,32,12,2], 107:[2,8,18,32,32,13,2],
+108:[2,8,18,32,32,14,2], 109:[2,8,18,32,32,15,2], 110:[2,8,18,32,32,17,1], 111:[2,8,18,32,32,18,1],
+112:[2,8,18,32,32,18,2], 113:[2,8,18,32,32,18,3], 114:[2,8,18,32,32,18,4], 115:[2,8,18,32,32,18,5],
+116:[2,8,18,32,32,18,6], 117:[2,8,18,32,32,18,7], 118:[2,8,18,32,32,18,8]
+};
+
+const ELEMENTS = RAW_ELEMENTS.map(item => ({
+number: item[0],
+symbol: item[1],
+name: item[2],
+mass: item[3],
+category: item[4],
+col: item[5],
+row: item[6],
+phase: item[7],
+year: item[8],
+config: item[9],
+summary: item[10],
+shells: SHELLS_BY_Z[item[0]] || [2]
+}));
+
+/**
+* ============================================================================
+* 2. THREE.JS 3D SCENE, WEBGL STARFIELD & CSS3D ELEMENT OBJECTS
+* ============================================================================
+*/
+let cssScene, cssCamera, cssRenderer, controls;
+let bgScene, bgCamera, bgRenderer, starPoints, burstParticles, burstVelocities;
+let rootGroup; // Parent 3D group holding all 118 element cards for global orbit spin
+
+const cardObjects = []; // Stores { object: CSS3DObject, element: Object, startPos, startRot, targetPos, targetRot }
+const targets = { table: [], sphere: [], helix: [], ring: [] };
+
+let currentShape = 'table';
+let isAutoOrbit = true;
+let activeCategory = null;
+let selectedElementIndex = 0;
+
+// Smooth morph transition state
+let morphProgress = 1;
+let morphDuration = 1.6; // seconds
+let isBigBangActive = false;
+let bigBangPhase = 'idle'; // 'implode' -> 'explode' -> 'assemble' -> 'idle'
+let bigBangTimer = 0;
+
+// Pointer drag vs click detection
+let pointerDownPos = { x: 0, y: 0 };
+
+function init() {
+initBackgroundWebGL();
+initCSS3DScene();
+buildCategoryLegend();
+bindUIEvents();
+startBigBangSequence(); // Automatically launch Big Bang Cosmic Assembly on load!
+animate();
+}
+
+/**
+* WebGL Cosmic Starfield + Big Bang Explosion Particle System
+*/
+function initBackgroundWebGL() {
+const canvas = document.getElementById('webgl-bg');
+bgScene = new THREE.Scene();
+bgCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
+bgCamera.position.z = 1000;
+
+bgRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+bgRenderer.setSize(window.innerWidth, window.innerHeight);
+bgRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+// Deep Space Starfield
+const starCount = 2400;
+const starGeo = new THREE.BufferGeometry();
+const starPos = new Float32Array(starCount * 3);
+const starColors = new Float32Array(starCount * 3);
+
+const palette = [
+new THREE.Color('#38bdf8'),
+new THREE.Color('#c084fc'),
+new THREE.Color('#f8fafc'),
+new THREE.Color('#fbbf24')
+];
+
+for (let i = 0; i < starCount; i++) {
+const r = 1200 + Math.random() * 2600;
+const theta = Math.random() * Math.PI * 2;
+const phi = Math.acos(2 * Math.random() - 1);
+
+starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+starPos[i * 3 + 2] = r * Math.cos(phi);
+
+const col = palette[Math.floor(Math.random() * palette.length)];
+starColors[i * 3] = col.r;
+starColors[i * 3 + 1] = col.g;
+starColors[i * 3 + 2] = col.b;
+}
+
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+const starMat = new THREE.PointsMaterial({
+size: 5.5,
+vertexColors: true,
+transparent: true,
+opacity: 0.85
+});
+
+starPoints = new THREE.Points(starGeo, starMat);
+bgScene.add(starPoints);
+
+// Big Bang Cosmic Spark Burst Particles
+const burstCount = 900;
+const burstGeo = new THREE.BufferGeometry();
+const burstPos = new Float32Array(burstCount * 3);
+const burstCol = new Float32Array(burstCount * 3);
+burstVelocities = [];
+
+for (let i = 0; i < burstCount; i++) {
+burstPos[i * 3] = 0;
+burstPos[i * 3 + 1] = 0;
+burstPos[i * 3 + 2] = 0;
+
+const theta = Math.random() * Math.PI * 2;
+const phi = Math.acos(2 * Math.random() - 1);
+const speed = 18 + Math.random() * 65;
+
+burstVelocities.push(new THREE.Vector3(
+speed * Math.sin(phi) * Math.cos(theta),
+speed * Math.sin(phi) * Math.sin(theta),
+speed * Math.cos(phi)
+));
+
+const c = palette[i % palette.length];
+burstCol[i * 3] = c.r;
+burstCol[i * 3 + 1] = c.g;
+burstCol[i * 3 + 2] = c.b;
+}
+
+burstGeo.setAttribute('position', new THREE.BufferAttribute(burstPos, 3));
+burstGeo.setAttribute('color', new THREE.BufferAttribute(burstCol, 3));
+
+const burstMat = new THREE.PointsMaterial({
+size: 8,
+vertexColors: true,
+transparent: true,
+opacity: 0
+});
+
+burstParticles = new THREE.Points(burstGeo, burstMat);
+bgScene.add(burstParticles);
+}
+
+/**
+* CSS3D Interactive Periodic Table Cards & 4 Geometric Formations
+*/
+function initCSS3DScene() {
+const container = document.getElementById('css3d-container');
+
+cssScene = new THREE.Scene();
+cssCamera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 1, 12000);
+cssCamera.position.set(0, 60, 2950);
+
+rootGroup = new THREE.Group();
+cssScene.add(rootGroup);
+
+// Create all 118 Element DOM Cards + CSS3DObjects
+ELEMENTS.forEach((el, idx) => {
+const cat = CATEGORIES[el.category];
+
+const card = document.createElement('div');
+card.className = 'element-card';
+card.style.setProperty('--el-color', cat.color);
+card.style.setProperty('--el-glow', cat.glow);
+
+card.innerHTML = `
+<div class="el-top">
+<span class="el-num">${el.number}</span>
+<span class="el-mass">${el.mass}</span>
+</div>
+<div class="el-symbol">${el.symbol}</div>
+<div>
+<div class="el-name">${el.name}</div>
+<div class="el-shells-mini">${el.shells.join('·')}</div>
+</div>
+`;
+
+// Track pointer down/up so dragging 3D space doesn't accidentally trigger click
+card.addEventListener('pointerdown', (e) => {
+pointerDownPos = { x: e.clientX, y: e.clientY };
+});
+
+card.addEventListener('pointerup', (e) => {
+const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+if (dist < 8) {
+openElementModal(idx);
+}
+});
+
+const cssObj = new THREE.CSS3DObject(card);
+cssObj.position.set(0, 0, 0);
+rootGroup.add(cssObj);
+
+cardObjects.push({
+object: cssObj,
+dom: card,
+element: el,
+startPos: new THREE.Vector3(),
+startRot: new THREE.Euler(),
+targetPos: new THREE.Vector3(),
+targetRot: new THREE.Euler()
+});
+});
+
+computeAllFormations();
+
+cssRenderer = new THREE.CSS3DRenderer();
+cssRenderer.setSize(window.innerWidth, window.innerHeight);
+container.appendChild(cssRenderer.domElement);
+
+// Smooth OrbitControls for 3D Mouse & Touch Interaction
+controls = new THREE.OrbitControls(cssCamera, cssRenderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.rotateSpeed = 0.7;
+controls.zoomSpeed = 0.9;
+controls.minDistance = 650;
+controls.maxDistance = 6200;
+}
+
+/**
+* Precomputes exact 3D positions & orientations for all 4 formations:
+* 1. Classic Periodic Table
+* 2. World Sphere (Fibonacci Globe)
+* 3. Double-Helix Ascending Spiral
+* 4. Galactic Orbital Ring
+*/
+function computeAllFormations() {
+const total = ELEMENTS.length;
+
+// --- 1. STANDARD PERIODIC TABLE ---
+ELEMENTS.forEach((el) => {
+const obj = new THREE.Object3D();
+// 18 columns centered around 0; rows 9-10 (Lanthanides/Actinides) slightly offset below
+const x = (el.col - 9.5) * 144;
+const yOffset = el.row >= 9 ? -42 : 0;
+const y = -(el.row - 5.3) * 182 + yOffset;
+const z = 0;
+
+obj.position.set(x, y, z);
+obj.rotation.set(0, 0, 0);
+targets.table.push(obj);
+});
+
+// --- 2. WORLD SPHERE (Fibonacci Lattice Globe) ---
+const sphereRadius = 920;
+const sphereVec = new THREE.Vector3();
+for (let i = 0; i < total; i++) {
+const phi = Math.acos(-1 + (2 * i + 1) / total);
+const theta = Math.sqrt(total * Math.PI) * phi;
+
+const obj = new THREE.Object3D();
+obj.position.setFromSphericalCoords(sphereRadius, phi, theta);
+
+sphereVec.copy(obj.position).multiplyScalar(2);
+obj.lookAt(sphereVec);
+targets.sphere.push(obj);
+}
+
+// --- 3. DOUBLE-HELIX SPIRAL TOWER ---
+const helixVec = new THREE.Vector3();
+for (let i = 0; i < total; i++) {
+// Interleaved double helix strands
+const strand = i % 2;
+const step = Math.floor(i / 2);
+const theta = step * 0.28 + strand * Math.PI;
+const y = -(step * 34) + 980;
+const radius = 840;
+
+const obj = new THREE.Object3D();
+obj.position.setFromCylindricalCoords(radius, theta, y);
+
+helixVec.set(obj.position.x * 2, obj.position.y, obj.position.z * 2);
+obj.lookAt(helixVec);
+targets.helix.push(obj);
+}
+
+// --- 4. GALACTIC ORBITAL RING (3 Concentric Tilted Rings) ---
+const ringVec = new THREE.Vector3();
+for (let i = 0; i < total; i++) {
+const ringIdx = i % 3; // 3 concentric rings
+const posInRing = Math.floor(i / 3);
+const countInRing = Math.ceil(total / 3);
+const angle = (posInRing / countInRing) * Math.PI * 2;
+const radius = 760 + ringIdx * 280;
+const y = (ringIdx - 1) * 140 + Math.sin(angle * 3) * 55;
+
+const obj = new THREE.Object3D();
+obj.position.set(
+Math.cos(angle) * radius,
+y,
+Math.sin(angle) * radius
+);
+
+ringVec.set(obj.position.x * 2, obj.position.y + 180, obj.position.z * 2);
+obj.lookAt(ringVec);
+targets.ring.push(obj);
+}
+}
+
+/**
+* Smoothly morphs all 118 cards from their current 3D transforms to the chosen shape
+*/
+function transformToShape(shapeName, duration = 1.6) {
+currentShape = shapeName;
+morphDuration = duration;
+morphProgress = 0;
+
+// Update active button styling
+document.querySelectorAll('[data-shape]').forEach(btn => {
+btn.classList.toggle('active', btn.dataset.shape === shapeName);
+});
+
+// Reset root rotation gently when returning to flat table so it faces the audience cleanly
+if (shapeName === 'table') {
+// Keep subtle angle or align forward
+}
+
+const targetList = targets[shapeName];
+cardObjects.forEach((item, i) => {
+item.startPos.copy(item.object.position);
+item.startRot.copy(item.object.rotation);
+item.targetPos.copy(targetList[i].position);
+item.targetRot.copy(targetList[i].rotation);
+});
+}
+
+/**
+* ============================================================================
+* 3. BIG BANG / COSMIC ASSEMBLY INTRO SEQUENCE
+* ============================================================================
+*/
+function startBigBangSequence() {
+isBigBangActive = true;
+bigBangPhase = 'singularity';
+bigBangTimer = 0;
+morphProgress = 1; // stop any running morph so it can't fight the explosion
+
+// Reset camera and root group
+rootGroup.rotation.set(0, 0, 0);
+cssCamera.position.set(0, 40, 3050);
+controls.target.set(0, 0, 0);
+
+// Collapse all 118 elements into the central singularity point (0,0,0)
+cardObjects.forEach((item) => {
+item.object.position.set(
+(Math.random() - 0.5) * 20,
+(Math.random() - 0.5) * 20,
+(Math.random() - 0.5) * 20
+);
+item.object.rotation.set(
+Math.random() * Math.PI * 2,
+Math.random() * Math.PI * 2,
+Math.random() * Math.PI * 2
+);
+item.object.scale.set(0.05, 0.05, 0.05);
+
+// Random outward cosmic explosion vector
+const theta = Math.random() * Math.PI * 2;
+const phi = Math.acos(2 * Math.random() - 1);
+const radius = 1100 + Math.random() * 1400;
+
+item.targetPos.set(
+radius * Math.sin(phi) * Math.cos(theta),
+radius * Math.sin(phi) * Math.sin(theta),
+radius * Math.cos(phi)
+);
+item.targetRot.set(
+(Math.random() - 0.5) * 4,
+(Math.random() - 0.5) * 4,
+(Math.random() - 0.5) * 4
+);
+});
+
+// Reset WebGL burst particles to center
+const posAttr = burstParticles.geometry.attributes.position;
+for (let i = 0; i < posAttr.count; i++) {
+posAttr.setXYZ(i, 0, 0, 0);
+}
+posAttr.needsUpdate = true;
+burstParticles.material.opacity = 1.0;
+
+// Trigger white-cyan Big Bang singularity flash
+const flash = document.getElementById('bigbang-flash');
+flash.style.transition = 'none';
+flash.style.opacity = '0.92';
+requestAnimationFrame(() => {
+requestAnimationFrame(() => {
+flash.style.transition = 'opacity 1.1s ease-out';
+flash.style.opacity = '0';
+});
+});
+
+// Phase 1: Outward Cosmic Explosion (0.0s -> 0.85s)
+bigBangPhase = 'explode';
+}
+
+/**
+* ============================================================================
+* 4. INTERACTIVE ELEMENT ENLARGEMENT & LIVE BOHR ELECTRON SHELL CANVAS
+* ============================================================================
+*/
+let bohrAnimId = null;
+let activeBohrElement = null;
+
+function openElementModal(index) {
+selectedElementIndex = index;
+const el = ELEMENTS[index];
+activeBohrElement = el;
+const cat = CATEGORIES[el.category];
+
+// Populate text fields
+document.getElementById('modal-badge').textContent = cat.label;
+document.getElementById('modal-badge').style.color = cat.color;
+document.getElementById('modal-badge').style.borderColor = cat.color;
+document.getElementById('modal-badge').style.backgroundColor = cat.glow;
+
+const period = el.row <= 7 ? el.row : (el.row === 9 ? 6 : 7);
+const groupLabel = el.row >= 9 ? (el.row === 9 ? 'Lanthanide' : 'Actinide') : `Group ${el.col}`;
+document.getElementById('modal-period-group').textContent = `Period ${period} • ${groupLabel}`;
+
+document.getElementById('modal-atomic-number').textContent = `#${el.number}`;
+document.getElementById('modal-atomic-number').style.color = cat.color;
+document.getElementById('modal-name').textContent = el.name;
+document.getElementById('modal-summary').textContent = el.summary;
+document.getElementById('modal-mass').textContent = `${el.mass} u`;
+document.getElementById('modal-phase').textContent = el.phase;
+document.getElementById('modal-config').textContent = el.config;
+document.getElementById('modal-discovery').textContent = `Discovered: ${el.year}`;
+
+const symBox = document.getElementById('modal-symbol-box');
+symBox.textContent = el.symbol;
+symBox.style.borderColor = cat.color;
+symBox.style.backgroundColor = cat.glow;
+symBox.style.boxShadow = `0 0 24px ${cat.glow}`;
+
+
+
+// Shell distribution badges (K, L, M, N, O, P, Q)
+const shellLetters = ['K', 'L', 'M', 'N', 'O', 'P', 'Q'];
+const pillsContainer = document.getElementById('modal-shells-pills');
+pillsContainer.innerHTML = el.shells.map((count, sIdx) => `
+<span class="px-2.5 py-1 rounded-lg bg-slate-800/90 border border-cyan-500/30 font-mono text-xs text-cyan-200">
+<strong class="text-cyan-400">${shellLetters[sIdx]}:</strong> ${count}e⁻
+</span>
+`).join('');
+
+// Reveal modal with smooth scale-up transition
+const modal = document.getElementById('element-modal');
+const modalCard = document.getElementById('modal-card');
+modal.classList.remove('hidden');
+modal.classList.add('flex');
+
+requestAnimationFrame(() => {
+modal.classList.remove('opacity-0');
+modalCard.classList.remove('scale-95');
+modalCard.classList.add('scale-100');
+});
+
+startBohrAnimation();
+}
+
+function closeElementModal() {
+const modal = document.getElementById('element-modal');
+const modalCard = document.getElementById('modal-card');
+modal.classList.add('opacity-0');
+modalCard.classList.remove('scale-100');
+modalCard.classList.add('scale-95');
+
+setTimeout(() => {
+if (!modal.classList.contains('opacity-0')) return; // reopened meanwhile
+modal.classList.add('hidden');
+modal.classList.remove('flex');
+if (bohrAnimId) {
+cancelAnimationFrame(bohrAnimId);
+bohrAnimId = null;
+}
+}, 260);
+}
+
+/**
+* Renders high-DPI animated Bohr Atomic Shell Model on #bohr-canvas
+*/
+function startBohrAnimation() {
+if (bohrAnimId) cancelAnimationFrame(bohrAnimId);
+
+const canvas = document.getElementById('bohr-canvas');
+const ctx = canvas.getContext('2d');
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+const size = 320;
+canvas.width = size * dpr;
+canvas.height = size * dpr;
+ctx.scale(dpr, dpr);
+
+const cx = size / 2;
+const cy = size / 2;
+
+function drawFrame(timeMs) {
+if (!activeBohrElement) return;
+const t = timeMs * 0.001;
+const el = activeBohrElement;
+const cat = CATEGORIES[el.category];
+const shells = el.shells;
+const numShells = shells.length;
+
+ctx.clearRect(0, 0, size, size);
+
+// Subtle radial quantum field glow
+const bgGrad = ctx.createRadialGradient(cx, cy, 8, cx, cy, size * 0.48);
+bgGrad.addColorStop(0, cat.glow);
+bgGrad.addColorStop(1, 'rgba(2, 6, 23, 0)');
+ctx.fillStyle = bgGrad;
+ctx.fillRect(0, 0, size, size);
+
+// Calculate concentric shell radii dynamically based on total shells (1 to 7)
+const minRadius = 34;
+const maxRadius = 142;
+const step = numShells > 1 ? (maxRadius - minRadius) / (numShells - 1) : 0;
+
+shells.forEach((electronCount, sIdx) => {
+const r = numShells === 1 ? 66 : minRadius + sIdx * step;
+
+// Draw glowing orbital ring
+ctx.beginPath();
+ctx.arc(cx, cy, r, 0, Math.PI * 2);
+ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+ctx.lineWidth = 1.3;
+ctx.stroke();
+
+// Alternate rotation direction & realistic angular velocity per shell
+const dir = sIdx % 2 === 0 ? 1 : -1;
+const speed = (1.35 / (sIdx + 1)) * dir;
+
+for (let e = 0; e < electronCount; e++) {
+const angle = (e / electronCount) * Math.PI * 2 + t * speed;
+const ex = cx + Math.cos(angle) * r;
+const ey = cy + Math.sin(angle) * r;
+
+// Electron outer glow
+ctx.beginPath();
+ctx.arc(ex, ey, 6.2, 0, Math.PI * 2);
+ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+ctx.fill();
+
+// Electron bright core
+ctx.beginPath();
+ctx.arc(ex, ey, 3.1, 0, Math.PI * 2);
+ctx.fillStyle = '#38bdf8';
+ctx.fill();
+}
+});
+
+// Glowing Atomic Nucleus
+const pulse = 1 + Math.sin(t * 4) * 0.05;
+const nucRadius = 18 * pulse;
+
+const nucGrad = ctx.createRadialGradient(cx - 4, cy - 4, 2, cx, cy, nucRadius * 1.4);
+nucGrad.addColorStop(0, '#ffffff');
+nucGrad.addColorStop(0.45, cat.color);
+nucGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+ctx.beginPath();
+ctx.arc(cx, cy, nucRadius * 1.4, 0, Math.PI * 2);
+ctx.fillStyle = nucGrad;
+ctx.fill();
+
+ctx.beginPath();
+ctx.arc(cx, cy, nucRadius, 0, Math.PI * 2);
+ctx.fillStyle = cat.color;
+ctx.fill();
+
+// Nucleus Proton Count Label
+ctx.fillStyle = '#040711';
+ctx.font = '700 11px "JetBrains Mono", monospace';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText(`${el.number}p⁺`, cx, cy);
+
+bohrAnimId = requestAnimationFrame(drawFrame);
+}
+
+bohrAnimId = requestAnimationFrame(drawFrame);
+}
+
+/**
+* ============================================================================
+* 5. CATEGORY LEGEND & UI INTERACTIONS
+* ============================================================================
+*/
+function buildCategoryLegend() {
+const legend = document.getElementById('category-legend');
+legend.innerHTML = Object.entries(CATEGORIES).map(([key, info]) => `
+<button data-cat="${key}"
+class="cat-btn flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-[11px] font-medium text-slate-200 hover:bg-slate-800/80 border border-transparent transition whitespace-nowrap cursor-pointer">
+<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${info.color}; box-shadow: 0 0 8px ${info.color};"></span>
+<span>${info.label}</span>
+</button>
+`).join('');
+
+legend.querySelectorAll('.cat-btn').forEach(btn => {
+btn.addEventListener('click', () => {
+const catKey = btn.dataset.cat;
+activeCategory = (activeCategory === catKey) ? null : catKey;
+updateCategoryHighlights();
+});
+});
+}
+
+function updateCategoryHighlights() {
+document.querySelectorAll('.cat-btn').forEach(btn => {
+const isSelected = btn.dataset.cat === activeCategory;
+btn.style.borderColor = isSelected ? CATEGORIES[btn.dataset.cat].color : 'transparent';
+btn.style.backgroundColor = isSelected ? 'rgba(30, 41, 59, 0.9)' : '';
+});
+
+cardObjects.forEach(item => {
+if (!activeCategory) {
+item.dom.classList.remove('dimmed', 'highlighted');
+} else if (item.element.category === activeCategory) {
+item.dom.classList.remove('dimmed');
+item.dom.classList.add('highlighted');
+} else {
+item.dom.classList.add('dimmed');
+item.dom.classList.remove('highlighted');
+}
+});
+}
+
+function bindUIEvents() {
+// Shape Morph Buttons
+document.querySelectorAll('[data-shape]').forEach(btn => {
+btn.addEventListener('click', () => {
+isBigBangActive = false;
+cardObjects.forEach(item => item.object.scale.set(1, 1, 1));
+// Smoothly normalize root orientation when switching to Table
+if (btn.dataset.shape === 'table') {
+rootGroup.rotation.set(0, 0, 0);
+}
+transformToShape(btn.dataset.shape, 1.5);
+});
+});
+
+// Replay Big Bang Intro Button
+document.getElementById('btn-bigbang').addEventListener('click', () => {
+startBigBangSequence();
+});
+
+// Auto-Orbit Toggle
+const btnOrbit = document.getElementById('btn-orbit');
+const orbitLabel = document.getElementById('orbit-label');
+btnOrbit.addEventListener('click', () => {
+isAutoOrbit = !isAutoOrbit;
+btnOrbit.classList.toggle('active', isAutoOrbit);
+orbitLabel.textContent = isAutoOrbit ? 'Auto-Orbit: ON' : 'Auto-Orbit: OFF';
+});
+
+// Clean Presentation Mode Toggle
+const btnClean = document.getElementById('btn-clean');
+const btnRestore = document.getElementById('btn-restore-hud');
+btnClean.addEventListener('click', () => {
+document.body.classList.add('presentation-clean');
+btnRestore.classList.remove('hidden');
+});
+btnRestore.addEventListener('click', () => {
+document.body.classList.remove('presentation-clean');
+btnRestore.classList.add('hidden');
+});
+
+// Modal Navigation & Close
+document.getElementById('btn-close-modal').addEventListener('click', closeElementModal);
+document.getElementById('element-modal').addEventListener('click', (e) => {
+if (e.target.id === 'element-modal') closeElementModal();
+});
+
+document.getElementById('btn-prev-el').addEventListener('click', () => {
+const prevIdx = (selectedElementIndex - 1 + ELEMENTS.length) % ELEMENTS.length;
+openElementModal(prevIdx);
+});
+
+document.getElementById('btn-next-el').addEventListener('click', () => {
+const nextIdx = (selectedElementIndex + 1) % ELEMENTS.length;
+openElementModal(nextIdx);
+});
+
+// Keyboard Shortcuts (Esc, Left/Right Arrows, 'H' for Clean Mode)
+window.addEventListener('keydown', (e) => {
+const modalOpen = !document.getElementById('element-modal').classList.contains('hidden');
+if (e.key === 'Escape' && modalOpen) {
+closeElementModal();
+} else if (e.key === 'ArrowRight' && modalOpen) {
+openElementModal((selectedElementIndex + 1) % ELEMENTS.length);
+} else if (e.key === 'ArrowLeft' && modalOpen) {
+openElementModal((selectedElementIndex - 1 + ELEMENTS.length) % ELEMENTS.length);
+} else if (e.key.toLowerCase() === 'h' && !modalOpen) {
+const isClean = document.body.classList.toggle('presentation-clean');
+btnRestore.classList.toggle('hidden', !isClean);
+}
+});
+
+// Responsive Window Resize
+window.addEventListener('resize', () => {
+const w = window.innerWidth;
+const h = window.innerHeight;
+
+bgCamera.aspect = w / h;
+bgCamera.updateProjectionMatrix();
+bgRenderer.setSize(w, h);
+
+cssCamera.aspect = w / h;
+cssCamera.updateProjectionMatrix();
+cssRenderer.setSize(w, h);
+});
+}
+
+/**
+* ============================================================================
+* 6. MAIN 60FPS ANIMATION & INTERPOLATION LOOP
+* ============================================================================
+*/
+let lastTime = performance.now();
+
+function easeOutQuint(t) {
+return 1 - Math.pow(1 - t, 5);
+}
+
+function easeInOutCubic(t) {
+return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function animate(now = performance.now()) {
+requestAnimationFrame(animate);
+
+const dt = Math.min((now - lastTime) / 1000, 0.05);
+lastTime = now;
+
+// 1. Rotate Cosmic Background Starfield
+if (starPoints) {
+starPoints.rotation.y += dt * 0.018;
+starPoints.rotation.x += dt * 0.005;
+}
+
+// 2. Big Bang Particle Burst Expansion
+if (burstParticles && burstParticles.material.opacity > 0.01) {
+const posAttr = burstParticles.geometry.attributes.position;
+for (let i = 0; i < posAttr.count; i++) {
+const v = burstVelocities[i];
+posAttr.setXYZ(
+i,
+posAttr.getX(i) + v.x * dt * 24,
+posAttr.getY(i) + v.y * dt * 24,
+posAttr.getZ(i) + v.z * dt * 24
+);
+}
+posAttr.needsUpdate = true;
+burstParticles.material.opacity = Math.max(0, burstParticles.material.opacity - dt * 0.48);
+}
+
+// 3. Big Bang Multi-Stage Choreography
+if (isBigBangActive) {
+bigBangTimer += dt;
+
+if (bigBangPhase === 'explode') {
+const p = Math.min(bigBangTimer / 0.9, 1);
+const ease = easeOutQuint(p);
+const scaleVal = 0.05 + ease * 0.95;
+
+cardObjects.forEach((item) => {
+item.object.position.lerpVectors(new THREE.Vector3(0, 0, 0), item.targetPos, ease);
+item.object.rotation.set(
+item.targetRot.x * ease,
+item.targetRot.y * ease,
+item.targetRot.z * ease
+);
+item.object.scale.set(scaleVal, scaleVal, scaleVal);
+});
+
+if (p >= 1) {
+bigBangPhase = 'assemble';
+transformToShape(currentShape, 1.75);
+}
+} else if (bigBangPhase === 'assemble' && morphProgress >= 1) {
+isBigBangActive = false;
+bigBangPhase = 'idle';
+}
+}
+
+// 4. Smooth 3D Formation Interpolation (Table <-> Sphere <-> Helix <-> Ring)
+if (morphProgress < 1) {
+morphProgress = Math.min(1, morphProgress + dt / morphDuration);
+const ease = easeInOutCubic(morphProgress);
+
+cardObjects.forEach((item) => {
+item.object.position.lerpVectors(item.startPos, item.targetPos, ease);
+item.object.rotation.set(
+item.startRot.x + (item.targetRot.x - item.startRot.x) * ease,
+item.startRot.y + (item.targetRot.y - item.startRot.y) * ease,
+item.startRot.z + (item.targetRot.z - item.startRot.z) * ease
+);
+});
+}
+
+// 5. Continuous 3D Orbit Spin for World Sphere, Helix Spiral & Orbital Ring
+if (isAutoOrbit && !isBigBangActive) {
+if (currentShape === 'sphere' || currentShape === 'helix' || currentShape === 'ring') {
+rootGroup.rotation.y += dt * 0.24;
+} else if (currentShape === 'table') {
+// Subtle gentle breathing sway for the flat Periodic Table so it stays readable
+rootGroup.rotation.y = Math.sin(now * 0.00045) * 0.09;
+}
+}
+
+controls.update();
+bgRenderer.render(bgScene, bgCamera);
+cssRenderer.render(cssScene, cssCamera);
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
